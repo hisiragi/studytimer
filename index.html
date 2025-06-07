@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>勉強タイマー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            min-height: 100vh;
+        }
+        
+        .timer-circle {
+            width: 280px;
+            height: 280px;
+            position: relative;
+        }
+        
+        .timer-circle svg {
+            transform: rotate(-90deg);
+        }
+        
+        .timer-circle circle {
+            transition: stroke-dashoffset 1s linear;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 1s infinite;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-6">
+    <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+        <h1 class="text-3xl font-bold text-center mb-6">勉強タイマー</h1>
+        
+        <div class="timer-circle mx-auto mb-6 flex items-center justify-center">
+            <svg width="280" height="280" viewBox="0 0 280 280">
+                <!-- Background circle -->
+                <circle cx="140" cy="140" r="120" fill="none" stroke="#f0f0f0" stroke-width="15"></circle>
+                <!-- Progress circle -->
+                <circle id="progress-circle" cx="140" cy="140" r="120" fill="none" stroke="#fda085" stroke-width="15" 
+                        stroke-dasharray="754" stroke-dashoffset="0"></circle>
+            </svg>
+            <div class="absolute flex flex-col items-center">
+                <div id="timer" class="text-5xl font-bold">25:00</div>
+                <div id="mode" class="text-xl mt-2 font-medium text-gray-600">勉強中</div>
+            </div>
+        </div>
+        
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="start-btn" class="bg-gradient-to-r from-orange-400 to-pink-500 hover:from-orange-500 hover:to-pink-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all">
+                スタート
+            </button>
+            <button id="reset-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-8 rounded-full shadow-lg transition-all">
+                リセット
+            </button>
+        </div>
+        
+        <div class="bg-gray-50 rounded-xl p-4">
+            <h2 class="font-bold text-lg mb-2">セッション記録</h2>
+            <div id="session-log" class="text-sm text-gray-600 space-y-1">
+                <div class="text-center text-gray-400 italic">まだセッションがありません</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification">
+        <span id="notification-text"></span>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // タイマー変数
+            let timer;
+            let timeLeft = 25 * 60; // 25分（秒単位）
+            let isRunning = false;
+            let isStudyMode = true;
+            let sessionCount = 0;
+            
+            const timerDisplay = document.getElementById('timer');
+            const modeDisplay = document.getElementById('mode');
+            const startBtn = document.getElementById('start-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const progressCircle = document.getElementById('progress-circle');
+            const sessionLog = document.getElementById('session-log');
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notification-text');
+            
+            // 円周の計算
+            const circumference = 2 * Math.PI * 120;
+            progressCircle.style.strokeDasharray = circumference;
+            
+            // タイマー表示の更新
+            function updateDisplay() {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                // 進捗円の更新
+                const totalTime = isStudyMode ? 25 * 60 : 5 * 60;
+                const dashOffset = circumference * (1 - timeLeft / totalTime);
+                progressCircle.style.strokeDashoffset = dashOffset;
+            }
+            
+            // 通知を表示
+            function showNotification(message) {
+                notificationText.textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+            
+            // セッションログの更新
+            function updateSessionLog(type) {
+                const now = new Date();
+                const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                
+                if (sessionLog.querySelector('.italic')) {
+                    sessionLog.innerHTML = '';
+                }
+                
+                const logItem = document.createElement('div');
+                logItem.className = 'flex justify-between';
+                
+                const typeSpan = document.createElement('span');
+                typeSpan.textContent = type === 'study' ? '勉強セッション完了' : '休憩セッション完了';
+                
+                const timeSpan = document.createElement('span');
+                timeSpan.textContent = timeString;
+                
+                logItem.appendChild(typeSpan);
+                logItem.appendChild(timeSpan);
+                
+                sessionLog.prepend(logItem);
+            }
+            
+            // タイマーモードの切り替え
+            function switchMode() {
+                isStudyMode = !isStudyMode;
+                
+                if (isStudyMode) {
+                    timeLeft = 25 * 60;
+                    modeDisplay.textContent = '勉強中';
+                    progressCircle.style.stroke = '#fda085';
+                    showNotification('休憩終了！勉強を始めましょう');
+                    updateSessionLog('break');
+                } else {
+                    timeLeft = 5 * 60;
+                    modeDisplay.textContent = '休憩中';
+                    progressCircle.style.stroke = '#4ade80';
+                    showNotification('お疲れ様でした！休憩しましょう');
+                    updateSessionLog('study');
+                    sessionCount++;
+                }
+                
+                updateDisplay();
+            }
+            
+            // カウントダウン関数
+            function countdown() {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    updateDisplay();
+                } else {
+                    // タイマー終了時の処理
+                    switchMode();
+                }
+            }
+            
+            // スタート/一時停止ボタン
+            startBtn.addEventListener('click', () => {
+                if (isRunning) {
+                    clearInterval(timer);
+                    startBtn.textContent = 'スタート';
+                    startBtn.classList.remove('pulse');
+                } else {
+                    timer = setInterval(countdown, 1000);
+                    startBtn.textContent = '一時停止';
+                    startBtn.classList.add('pulse');
+                }
+                isRunning = !isRunning;
+            });
+            
+            // リセットボタン
+            resetBtn.addEventListener('click', () => {
+                clearInterval(timer);
+                isRunning = false;
+                isStudyMode = true;
+                timeLeft = 25 * 60;
+                startBtn.textContent = 'スタート';
+                startBtn.classList.remove('pulse');
+                modeDisplay.textContent = '勉強中';
+                progressCircle.style.stroke = '#fda085';
+                updateDisplay();
+                showNotification('タイマーをリセットしました');
+            });
+            
+            // 初期表示の更新
+            updateDisplay();
+        });
+    </script>
+</body>
+</html>
