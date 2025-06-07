@@ -3,4 +3,4 @@
 ## 中身はhtmlだけで構成されています
 https://studytimer.hisiragi.f5.si/ 
 https://hisiragi.github.io/studytimer/
-URLどちらともからアクセス可能、サイトがブロックされる場合はどちらかをお使いください。
+※Githubリンクはリダイレクトされます
